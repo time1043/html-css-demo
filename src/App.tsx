@@ -1,20 +1,11 @@
-import { useState } from 'react'
-
-import ThemeController from './components/theme-controller'
+import SwirlBackground from './components/swirl-background'
 
 export default function App() {
-  const [count, setCount] = useState(0)
-  const doubleCount = count * 2
-
   return (
-    <div>
-      <p className="text-3xl font-bold">
-        {count} * 2 = {doubleCount}
-      </p>
-      <button className="btn" onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-      <ThemeController />
-    </div>
+    <>
+      <SwirlBackground />
+      {/* The Balatro homepage UI (title, menu buttons, etc.) will be layered here later */}
+      <main className="stage" />
+    </>
   )
 }
