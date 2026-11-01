@@ -1,0 +1,6 @@
+# for macos
+.DS_Store
+
+# for nodejs
+node_modules/
+dist/
