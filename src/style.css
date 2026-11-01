@@ -1,0 +1,45 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #0a0a0f;
+}
+
+/* Shader canvas: fills the viewport as the background */
+#swirl {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Static fallback when WebGL is unavailable or the shader files
+   fail to load (e.g. the page opened via file://): the same four-color band */
+body.no-webgl #swirl {
+  background: linear-gradient(
+    90deg,
+    #ffb021,
+    #29e0d2 20%,
+    #1761c7 40%,
+    #ff2e75 60%,
+    #ffb021 80%,
+    #29e0d2
+  );
+}
+
+/* Container for the Balatro homepage UI, to be added later */
+.stage {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
