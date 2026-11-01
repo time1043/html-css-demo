@@ -1,6 +1,6 @@
 // ================== Tunable parameters (tweak these while polishing) ==================
 const CONFIG = {
-  freq: 0.65, // Color band frequency: higher means narrower bands
+  freq: 0.8, // Color band frequency: higher means narrower bands (fitted to the tutorial)
 };
 
 // Vertex shader: one big triangle covering the whole screen
@@ -18,23 +18,27 @@ precision highp float;
 uniform vec2 u_size;  // Canvas size in pixels
 uniform float u_freq; // Color band frequency
 
-// The four colors on the band (picked from the tutorial screenshots)
-const vec3 CYAN   = vec3(0.16, 0.88, 0.82);
-const vec3 BLUE   = vec3(0.09, 0.38, 0.78);
-const vec3 PINK   = vec3(1.00, 0.18, 0.46);
-const vec3 ORANGE = vec3(1.00, 0.69, 0.13);
+// The four colors on the band, measured from the flat plateaus of the tutorial's canvas
+const vec3 CYAN   = vec3(0.094, 0.765, 0.776);
+const vec3 BLUE   = vec3(0.000, 0.443, 0.741);
+const vec3 PINK   = vec3(1.000, 0.176, 0.565);
+const vec3 ORANGE = vec3(1.000, 0.710, 0.188);
 
-// Phase shift that lines the bands up with the tutorial screenshot (orange around x = 0.4)
-const float BAND_PHASE = 0.49;
+// Phase shift that lines the bands up with the tutorial (pure orange around x = 0.32)
+const float BAND_PHASE = 0.5;
+
+// Half width of the blend between neighboring colors; the rest of each
+// segment stays a flat plateau (this gives the bands their crisp edges)
+const float BAND_SOFT = 0.25;
 
 // Take the x coordinate and look up a color on the band:
 // four color segments joined head-to-tail into a loop
 vec3 paint(float x) {
   float t = fract(x * u_freq + BAND_PHASE) * 4.0;
-  vec3 col = mix(CYAN,   BLUE,   smoothstep(0.0, 1.0, t));
-  col = mix(col, PINK,   smoothstep(1.0, 2.0, t));
-  col = mix(col, ORANGE, smoothstep(2.0, 3.0, t));
-  col = mix(col, CYAN,   smoothstep(3.0, 4.0, t));
+  vec3 col = mix(CYAN,   BLUE,   smoothstep(0.5 - BAND_SOFT, 0.5 + BAND_SOFT, t));
+  col = mix(col, PINK,   smoothstep(1.5 - BAND_SOFT, 1.5 + BAND_SOFT, t));
+  col = mix(col, ORANGE, smoothstep(2.5 - BAND_SOFT, 2.5 + BAND_SOFT, t));
+  col = mix(col, CYAN,   smoothstep(3.5 - BAND_SOFT, 3.5 + BAND_SOFT, t));
   return col;
 }
 
