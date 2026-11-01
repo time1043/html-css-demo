@@ -84,6 +84,10 @@ async function init() {
   const uSwirl = gl.getUniformLocation(program, "u_swirl");
   const uTime = gl.getUniformLocation(program, "u_time");
 
+  // Optional ?t=<seconds> pins the shader clock, useful for frame-by-frame comparisons
+  const pinnedTime = parseFloat(new URLSearchParams(location.search).get("t"));
+  const hasPinnedTime = Number.isFinite(pinnedTime);
+
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -114,7 +118,7 @@ async function init() {
     elapsed += Math.min((now - last) / 1000, 0.1);
     last = now;
 
-    render(elapsed);
+    render(hasPinnedTime ? pinnedTime : elapsed);
 
     requestAnimationFrame(frame);
   }
@@ -123,7 +127,7 @@ async function init() {
   // Redraw on events that can happen while rAF is throttled (hidden tab):
   // window resize, visibility returning, and device-pixel-ratio flips
   // (the resize event does not fire for DPR-only changes)
-  const redraw = () => render(elapsed);
+  const redraw = () => render(hasPinnedTime ? pinnedTime : elapsed);
   window.addEventListener("resize", redraw);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) redraw();

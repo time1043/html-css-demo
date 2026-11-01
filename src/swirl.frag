@@ -1,5 +1,4 @@
-// Balatro swirl background — tutorial steps 01-04: the rainbow band twisted
-// into a swirl that spins with time
+// Balatro swirl background — tutorial steps 01-06: twist, wobble, spin
 // (this file mirrors the tutorial's own swirl.frag)
 
 precision highp float;
@@ -21,6 +20,11 @@ const float BAND_PHASE = 0.5;
 // Half width of the blend between neighboring colors; the rest of each
 // segment stays a flat plateau (this gives the bands their crisp edges)
 const float BAND_SOFT = 0.25;
+
+// Wobble: repeatedly nudge p by its own position — this bends the swirl
+// arms into the wavy Balatro look
+const float WOBBLE_AMP = 0.6; // Strength of each nudge
+const int WOBBLE_ITER = 5;    // How many times the nudge is applied
 
 // Rotate point v around the origin by a radians (counterclockwise)
 vec2 rotate(vec2 v, float a) {
@@ -51,7 +55,14 @@ void main() {
   // and the whole pattern keeps spinning as time passes
   p = rotate(p, r * u_swirl - u_time);
 
-  // 04: Take the x coordinate and look up the color on the band
+  // 04: Wobble — "look at where you are, then push yourself by that position".
+  // p.yx feeds (y, x) back into sin, so x gets pushed by y and y by x;
+  // applying it repeatedly bends the swirl arms into wavy bands
+  for (int i = 0; i < WOBBLE_ITER; i++) {
+    p += WOBBLE_AMP * sin(p.yx + u_time);
+  }
+
+  // 05: Take the x coordinate and look up the color on the band
   vec3 color = paint(p.x);
 
   gl_FragColor = vec4(color, 1.0);
