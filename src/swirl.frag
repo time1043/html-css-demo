@@ -1,4 +1,4 @@
-// Balatro swirl background — tutorial steps 01-06: twist, wobble, spin
+// Balatro swirl background — tutorial steps 01-07: pixelate, twist, wobble, spin
 // (this file mirrors the tutorial's own swirl.frag)
 
 precision highp float;
@@ -26,6 +26,9 @@ const float BAND_SOFT = 0.25;
 const float WOBBLE_AMP = 0.6; // Strength of each nudge
 const int WOBBLE_ITER = 5;    // How many times the nudge is applied
 
+// Pixelate: every 8x8 render-pixel block shares one address (the pixel-art look)
+const float PIXEL_SIZE = 8.0;
+
 // Rotate point v around the origin by a radians (counterclockwise)
 vec2 rotate(vec2 v, float a) {
   float s = sin(a);
@@ -45,24 +48,28 @@ vec3 paint(float x) {
 }
 
 void main() {
-  // 01: Move the origin to the center of the screen; screen height counts as 1
-  vec2 p = (gl_FragCoord.xy - 0.5 * u_size) / u_size.y;
+  // 01: Pixelate — snap the pixel onto an 8x8 block corner so neighboring
+  // pixels share one address ("nearby points squeeze onto the same address")
+  vec2 pos = floor(gl_FragCoord.xy / PIXEL_SIZE) * PIXEL_SIZE;
 
-  // 02: Distance from the center
+  // 02: Move the origin to the center of the screen; screen height counts as 1
+  vec2 p = (pos - 0.5 * u_size) / u_size.y;
+
+  // 03: Distance from the center
   float r = length(p);
 
-  // 03: Rotate around the center: the farther out, the more it turns,
+  // 04: Rotate around the center: the farther out, the more it turns,
   // and the whole pattern keeps spinning as time passes
   p = rotate(p, r * u_swirl - u_time);
 
-  // 04: Wobble — "look at where you are, then push yourself by that position".
+  // 05-06: Wobble — "look at where you are, then push yourself by that position".
   // p.yx feeds (y, x) back into sin, so x gets pushed by y and y by x;
   // applying it repeatedly bends the swirl arms into wavy bands
   for (int i = 0; i < WOBBLE_ITER; i++) {
     p += WOBBLE_AMP * sin(p.yx + u_time);
   }
 
-  // 05: Take the x coordinate and look up the color on the band
+  // 07: Take the x coordinate and look up the color on the band
   vec3 color = paint(p.x);
 
   gl_FragColor = vec4(color, 1.0);
