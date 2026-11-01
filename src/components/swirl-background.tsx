@@ -64,6 +64,7 @@ export default function SwirlBackground() {
     const uSize = gl.getUniformLocation(program, 'u_size')
     const uFreq = gl.getUniformLocation(program, 'u_freq')
     const uSwirl = gl.getUniformLocation(program, 'u_swirl')
+    const uTime = gl.getUniformLocation(program, 'u_time')
 
     // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
     const resize = () => {
@@ -78,32 +79,40 @@ export default function SwirlBackground() {
     }
 
     // One draw pass: sync the backing store, push uniforms, draw
-    const render = () => {
+    const render = (timeValue: number) => {
       resize()
       gl.uniform2f(uSize, canvas.width, canvas.height)
+      gl.uniform1f(uTime, timeValue)
       gl.uniform1f(uFreq, CONFIG.freq)
       gl.uniform1f(uSwirl, CONFIG.swirl)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }
 
-    // Render loop: the picture is static for now, but the loop is the skeleton
-    // that the upcoming animation steps will plug into
-    let rafId = requestAnimationFrame(function frame() {
-      render()
+    // Render loop: feed elapsed time into the shader so the swirl keeps spinning
+    let elapsed = 0
+    let last = performance.now()
+    let rafId = requestAnimationFrame(function frame(now: number) {
+      // Cap each step so the picture never jumps after a background tab
+      elapsed += Math.min((now - last) / 1000, 0.1)
+      last = now
+
+      render(elapsed)
+
       rafId = requestAnimationFrame(frame)
     })
 
     // Redraw on events that can happen while rAF is throttled (hidden tab):
     // window resize, visibility returning, and device-pixel-ratio flips
     // (the resize event does not fire for DPR-only changes)
-    window.addEventListener('resize', render)
+    const redraw = () => render(elapsed)
+    window.addEventListener('resize', redraw)
     const onVisibilityChange = () => {
-      if (!document.hidden) render()
+      if (!document.hidden) render(elapsed)
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     let dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
     const onDprChange = () => {
-      render()
+      render(elapsed)
       dprQuery.removeEventListener('change', onDprChange)
       dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
       dprQuery.addEventListener('change', onDprChange)
@@ -112,7 +121,7 @@ export default function SwirlBackground() {
 
     return () => {
       cancelAnimationFrame(rafId)
-      window.removeEventListener('resize', render)
+      window.removeEventListener('resize', redraw)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       dprQuery.removeEventListener('change', onDprChange)
       // Free the GL objects but keep the context itself alive, so React
