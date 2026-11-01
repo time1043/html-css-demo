@@ -1,14 +1,126 @@
-let count = 0;
+// ================== Tunable parameters (tweak these while polishing) ==================
+const CONFIG = {
+  freq: 0.65, // Color band frequency: higher means narrower bands
+};
 
-const displayText = document.getElementById("display-text");
-const button = document.getElementById("increment-btn");
+// Vertex shader: one big triangle covering the whole screen
+const VERT = /* glsl */ `
+attribute vec2 a_pos;
+void main() {
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}
+`;
 
-function render() {
-  const doubleCount = count * 2;
-  displayText.textContent = `${count} * 2 = ${doubleCount}`;
+// Fragment shader: tutorial step 02 — a static rainbow band sampled by paint(p.x)
+const FRAG = /* glsl */ `
+precision highp float;
+
+uniform vec2 u_size;  // Canvas size in pixels
+uniform float u_freq; // Color band frequency
+
+// The four colors on the band (picked from the tutorial screenshots)
+const vec3 CYAN   = vec3(0.16, 0.88, 0.82);
+const vec3 BLUE   = vec3(0.09, 0.38, 0.78);
+const vec3 PINK   = vec3(1.00, 0.18, 0.46);
+const vec3 ORANGE = vec3(1.00, 0.69, 0.13);
+
+// Phase shift that lines the bands up with the tutorial screenshot (orange around x = 0.4)
+const float BAND_PHASE = 0.49;
+
+// Take the x coordinate and look up a color on the band:
+// four color segments joined head-to-tail into a loop
+vec3 paint(float x) {
+  float t = fract(x * u_freq + BAND_PHASE) * 4.0;
+  vec3 col = mix(CYAN,   BLUE,   smoothstep(0.0, 1.0, t));
+  col = mix(col, PINK,   smoothstep(1.0, 2.0, t));
+  col = mix(col, ORANGE, smoothstep(2.0, 3.0, t));
+  col = mix(col, CYAN,   smoothstep(3.0, 4.0, t));
+  return col;
 }
 
-button.addEventListener("click", () => {
-  count++;
-  render();
-});
+void main() {
+  // 01: Move the origin to the center of the screen; screen height counts as 1
+  vec2 p = (gl_FragCoord.xy - 0.5 * u_size) / u_size.y;
+
+  // 02: Take the x coordinate and look up the color on the band
+  vec3 color = paint(p.x);
+
+  gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+function init() {
+  const canvas = document.getElementById("swirl");
+  const gl =
+    canvas.getContext("webgl", { antialias: false }) ||
+    canvas.getContext("experimental-webgl");
+
+  // Fall back to a static CSS gradient when WebGL is unavailable
+  if (!gl) {
+    document.body.classList.add("no-webgl");
+    return;
+  }
+
+  // Compile a shader; log the info log on failure
+  function compile(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  }
+
+  const program = gl.createProgram();
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(program));
+    document.body.classList.add("no-webgl");
+    return;
+  }
+  gl.useProgram(program);
+
+  // The fullscreen big triangle
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 3, -1, -1, 3]),
+    gl.STATIC_DRAW
+  );
+  const aPos = gl.getAttribLocation(program, "a_pos");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const uSize = gl.getUniformLocation(program, "u_size");
+  const uFreq = gl.getUniformLocation(program, "u_freq");
+
+  // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.round(canvas.clientWidth * dpr);
+    const h = Math.round(canvas.clientHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      gl.viewport(0, 0, w, h);
+    }
+  }
+
+  // Render loop: the picture is static for now, but the loop is the skeleton
+  // that the upcoming animation steps will plug into
+  function frame() {
+    resize();
+    gl.uniform2f(uSize, canvas.width, canvas.height);
+    gl.uniform1f(uFreq, CONFIG.freq);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+init();
