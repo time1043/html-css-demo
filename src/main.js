@@ -1,5 +1,6 @@
 // ================== Tunable parameters (tweak these while polishing) ==================
 const CONFIG = {
+  swirl: 4.0, // Twist intensity: the farther from the center, the more it turns (the 4.0 from tutorial step 03)
   freq: 0.8, // Color band frequency: higher means narrower bands (fitted to the tutorial)
 };
 
@@ -11,12 +12,13 @@ void main() {
 }
 `;
 
-// Fragment shader: tutorial step 02 — a static rainbow band sampled by paint(p.x)
+// Fragment shader: tutorial steps 01-04 — the rainbow band twisted into a static swirl
 const FRAG = /* glsl */ `
 precision highp float;
 
-uniform vec2 u_size;  // Canvas size in pixels
-uniform float u_freq; // Color band frequency
+uniform vec2 u_size;   // Canvas size in pixels
+uniform float u_freq;  // Color band frequency
+uniform float u_swirl; // Twist intensity
 
 // The four colors on the band, measured from the flat plateaus of the tutorial's canvas
 const vec3 CYAN   = vec3(0.094, 0.765, 0.776);
@@ -30,6 +32,13 @@ const float BAND_PHASE = 0.5;
 // Half width of the blend between neighboring colors; the rest of each
 // segment stays a flat plateau (this gives the bands their crisp edges)
 const float BAND_SOFT = 0.25;
+
+// Rotate point v around the origin by a radians (counterclockwise)
+vec2 rotate(vec2 v, float a) {
+  float s = sin(a);
+  float c = cos(a);
+  return mat2(c, s, -s, c) * v;
+}
 
 // Take the x coordinate and look up a color on the band:
 // four color segments joined head-to-tail into a loop
@@ -46,7 +55,13 @@ void main() {
   // 01: Move the origin to the center of the screen; screen height counts as 1
   vec2 p = (gl_FragCoord.xy - 0.5 * u_size) / u_size.y;
 
-  // 02: Take the x coordinate and look up the color on the band
+  // 02: Distance from the center
+  float r = length(p);
+
+  // 03: Rotate around the center: the farther out, the more it turns
+  p = rotate(p, r * u_swirl);
+
+  // 04: Take the x coordinate and look up the color on the band
   vec3 color = paint(p.x);
 
   gl_FragColor = vec4(color, 1.0);
@@ -101,6 +116,7 @@ function init() {
 
   const uSize = gl.getUniformLocation(program, "u_size");
   const uFreq = gl.getUniformLocation(program, "u_freq");
+  const uSwirl = gl.getUniformLocation(program, "u_swirl");
 
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
   function resize() {
@@ -120,6 +136,7 @@ function init() {
     resize();
     gl.uniform2f(uSize, canvas.width, canvas.height);
     gl.uniform1f(uFreq, CONFIG.freq);
+    gl.uniform1f(uSwirl, CONFIG.swirl);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     requestAnimationFrame(frame);
