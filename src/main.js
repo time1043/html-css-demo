@@ -82,6 +82,7 @@ async function init() {
   const uSize = gl.getUniformLocation(program, "u_size");
   const uFreq = gl.getUniformLocation(program, "u_freq");
   const uSwirl = gl.getUniformLocation(program, "u_swirl");
+  const uTime = gl.getUniformLocation(program, "u_time");
 
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
   function resize() {
@@ -96,18 +97,25 @@ async function init() {
   }
 
   // One draw pass: sync the backing store, push uniforms, draw
-  function render() {
+  function render(timeValue) {
     resize();
     gl.uniform2f(uSize, canvas.width, canvas.height);
+    gl.uniform1f(uTime, timeValue);
     gl.uniform1f(uFreq, CONFIG.freq);
     gl.uniform1f(uSwirl, CONFIG.swirl);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  // Render loop: the picture is static for now, but the loop is the skeleton
-  // that the upcoming animation steps will plug into
-  function frame() {
-    render();
+  // Render loop: feed elapsed time into the shader so the swirl keeps spinning
+  let elapsed = 0;
+  let last = performance.now();
+  function frame(now) {
+    // Cap each step so the picture never jumps after a background tab
+    elapsed += Math.min((now - last) / 1000, 0.1);
+    last = now;
+
+    render(elapsed);
+
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -115,7 +123,7 @@ async function init() {
   // Redraw on events that can happen while rAF is throttled (hidden tab):
   // window resize, visibility returning, and device-pixel-ratio flips
   // (the resize event does not fire for DPR-only changes)
-  const redraw = () => render();
+  const redraw = () => render(elapsed);
   window.addEventListener("resize", redraw);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) redraw();

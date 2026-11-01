@@ -1,4 +1,5 @@
-// Balatro swirl background — tutorial steps 01-03: coordinate, distance, twist
+// Balatro swirl background — tutorial steps 01-04: the rainbow band twisted
+// into a swirl that spins with time
 // (this file mirrors the tutorial's own swirl.frag)
 
 precision highp float;
@@ -6,6 +7,7 @@ precision highp float;
 uniform vec2 u_size;   // Canvas size in pixels
 uniform float u_freq;  // Color band frequency
 uniform float u_swirl; // Twist intensity
+uniform float u_time;  // Elapsed seconds
 
 // The four colors on the band, measured from the flat plateaus of the tutorial's canvas
 const vec3 CYAN   = vec3(0.094, 0.765, 0.776);
@@ -45,8 +47,9 @@ void main() {
   // 02: Distance from the center
   float r = length(p);
 
-  // 03: Rotate around the center: the farther out, the more it turns
-  p = rotate(p, r * u_swirl);
+  // 03: Rotate around the center: the farther out, the more it turns,
+  // and the whole pattern keeps spinning as time passes
+  p = rotate(p, r * u_swirl - u_time);
 
   // 04: Take the x coordinate and look up the color on the band
   vec3 color = paint(p.x);
