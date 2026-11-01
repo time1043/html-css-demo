@@ -12,13 +12,14 @@ void main() {
 }
 `;
 
-// Fragment shader: tutorial steps 01-04 — the rainbow band twisted into a static swirl
+// Fragment shader: tutorial steps 01-04 — the rainbow band twisted into a swirl that spins with time
 const FRAG = /* glsl */ `
 precision highp float;
 
 uniform vec2 u_size;   // Canvas size in pixels
 uniform float u_freq;  // Color band frequency
 uniform float u_swirl; // Twist intensity
+uniform float u_time;  // Elapsed seconds
 
 // The four colors on the band, measured from the flat plateaus of the tutorial's canvas
 const vec3 CYAN   = vec3(0.094, 0.765, 0.776);
@@ -58,8 +59,9 @@ void main() {
   // 02: Distance from the center
   float r = length(p);
 
-  // 03: Rotate around the center: the farther out, the more it turns
-  p = rotate(p, r * u_swirl);
+  // 03: Rotate around the center: the farther out, the more it turns,
+  // and the whole pattern keeps spinning as time passes
+  p = rotate(p, r * u_swirl - u_time);
 
   // 04: Take the x coordinate and look up the color on the band
   vec3 color = paint(p.x);
@@ -117,6 +119,7 @@ function init() {
   const uSize = gl.getUniformLocation(program, "u_size");
   const uFreq = gl.getUniformLocation(program, "u_freq");
   const uSwirl = gl.getUniformLocation(program, "u_swirl");
+  const uTime = gl.getUniformLocation(program, "u_time");
 
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
   function resize() {
@@ -130,11 +133,17 @@ function init() {
     }
   }
 
-  // Render loop: the picture is static for now, but the loop is the skeleton
-  // that the upcoming animation steps will plug into
-  function frame() {
+  // Render loop: feed elapsed time into the shader so the swirl keeps spinning
+  let elapsed = 0;
+  let last = performance.now();
+  function frame(now) {
+    // Cap each step so the picture never jumps after a background tab
+    elapsed += Math.min((now - last) / 1000, 0.1);
+    last = now;
+
     resize();
     gl.uniform2f(uSize, canvas.width, canvas.height);
+    gl.uniform1f(uTime, elapsed);
     gl.uniform1f(uFreq, CONFIG.freq);
     gl.uniform1f(uSwirl, CONFIG.swirl);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
