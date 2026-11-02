@@ -75,7 +75,10 @@ void main() {
   // and the whole pattern keeps spinning as time passes
   p = rotate(p, r * u_swirl - u_time);
 
-  // 05-06: Wobble — "look at where you are, then push yourself by that position".
+  // 05: Scale up the map before the wobble nudge
+  p = p * 30.0;
+
+  // 06: Wobble — "look at where you are, then push yourself by that position".
   // p.yx feeds (y, x) back into sin, so x gets pushed by y and y by x;
   // applying it repeatedly bends the swirl arms into wavy bands
   for (int i = 0; i < WOBBLE_ITER; i++) {
