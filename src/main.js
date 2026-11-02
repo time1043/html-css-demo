@@ -2,6 +2,7 @@
 const CONFIG = {
   swirl: 4.0, // Twist intensity: the farther from the center, the more it turns (the 4.0 from tutorial step 03)
   freq: 0.1, // Color band frequency: 0.1 gives 1 full color cycle every 10 distance units (matches tutorial step 08)
+  spin: 0.25, // Global rotation speed in rad/s; the tutorial hardcoded 1.0 (one full turn every ~6.3s). Lower = slower
 };
 
 // Vertex shader: one big triangle covering the whole screen
@@ -19,6 +20,7 @@ precision highp float;
 uniform vec2 u_size;   // Canvas size in pixels
 uniform float u_freq;  // Color band frequency
 uniform float u_swirl; // Twist intensity
+uniform float u_spin;  // Global rotation speed in rad/s
 uniform float u_time;  // Elapsed seconds
 
 // The four colors on the band, measured from the flat plateaus of the tutorial's canvas
@@ -90,8 +92,8 @@ void main() {
   float r = length(p);
 
   // 04: Rotate around the center: the farther out, the more it turns,
-  // and the whole pattern keeps spinning as time passes
-  p = rotate(p, r * u_swirl - u_time);
+  // and the whole pattern keeps spinning as time passes (u_spin scales the speed)
+  p = rotate(p, r * u_swirl - u_time * u_spin);
 
   // 05: Scale up coordinates before deformation loop
   p = p * 30.0;
@@ -167,6 +169,7 @@ function init() {
   const uSize = gl.getUniformLocation(program, "u_size");
   const uFreq = gl.getUniformLocation(program, "u_freq");
   const uSwirl = gl.getUniformLocation(program, "u_swirl");
+  const uSpin = gl.getUniformLocation(program, "u_spin");
   const uTime = gl.getUniformLocation(program, "u_time");
 
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
@@ -198,6 +201,7 @@ function init() {
     gl.uniform1f(uTime, hasPinnedTime ? pinnedTime : elapsed);
     gl.uniform1f(uFreq, CONFIG.freq);
     gl.uniform1f(uSwirl, CONFIG.swirl);
+    gl.uniform1f(uSpin, CONFIG.spin);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     requestAnimationFrame(frame);
