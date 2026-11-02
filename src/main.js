@@ -1,7 +1,7 @@
 // ================== Tunable parameters (tweak these while polishing) ==================
 const CONFIG = {
   swirl: 4.0, // Twist intensity: the farther from the center, the more it turns (the 4.0 from tutorial step 03)
-  freq: 0.8, // Color band frequency: higher means narrower bands (fitted to the tutorial)
+  freq: 0.1, // Color band frequency: 0.1 gives 1 full color cycle every 10 distance units (matches tutorial step 08)
 };
 
 // Vertex shader: one big triangle covering the whole screen
@@ -49,7 +49,7 @@ vec2 rotate(vec2 v, float a) {
   return mat2(c, s, -s, c) * v;
 }
 
-// Direction vector from accumulated coordinate ("方向")
+// Direction vector from accumulated coordinate (dir)
 vec2 dir(vec2 acc) {
   return vec2(
     cos(5.1123314 + 0.353 * acc.y + u_time * 0.131121),
@@ -62,15 +62,20 @@ vec2 diagonalTwist(vec2 p) {
   return vec2(cos(p.x + p.y) - sin(p.x * 0.711 - p.y));
 }
 
-// Take the x coordinate and look up a color on the band:
+// Band color: look up a color on the band by distance (concentric rings)
 // four color segments joined head-to-tail into a loop
-vec3 paint(float x) {
-  float t = fract(x * u_freq + BAND_PHASE) * 4.0;
+vec3 bandColor(float dist) {
+  float t = fract(dist * u_freq + BAND_PHASE) * 4.0;
   vec3 col = mix(CYAN,   BLUE,   smoothstep(0.5 - BAND_SOFT, 0.5 + BAND_SOFT, t));
   col = mix(col, PINK,   smoothstep(1.5 - BAND_SOFT, 1.5 + BAND_SOFT, t));
   col = mix(col, ORANGE, smoothstep(2.5 - BAND_SOFT, 2.5 + BAND_SOFT, t));
   col = mix(col, CYAN,   smoothstep(3.5 - BAND_SOFT, 3.5 + BAND_SOFT, t));
   return col;
+}
+
+// Backward-compatible alias for paint
+vec3 paint(float x) {
+  return bandColor(x);
 }
 
 void main() {
@@ -106,8 +111,8 @@ void main() {
     p -= 1.0 * diagonalTwist(p);
   }
 
-  // 10: Look up the color on the band
-  vec3 color = paint(p.x);
+  // 10: Look up color by distance from center: concentric rings
+  vec3 color = bandColor(length(p));
 
   gl_FragColor = vec4(color, 1.0);
 }
