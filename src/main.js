@@ -42,7 +42,7 @@ const float WOBBLE_AMP = 0.6; // Strength of each nudge
 const int WOBBLE_ITER = 5;    // How many times the nudge is applied
 
 // Pixelate: every 8x8 render-pixel block shares one address (the pixel-art look)
-const float PIXEL_SIZE = 8.0;
+const float PIXEL_SIZE = 2.0;
 
 // Rotate point v around the origin by a radians (counterclockwise)
 vec2 rotate(vec2 v, float a) {
