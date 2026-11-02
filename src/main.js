@@ -4,6 +4,44 @@ const CONFIG = {
   spin: 0.25, // Global rotation speed in rad/s; the tutorial hardcoded 1.0 (one full turn every ~6.3s). Lower = slower
 };
 
+// The game's ring palette as a 1D gradient (256 RGB stops), measured from the
+// game's own radial palette: a blue core in the middle, a red ring around it,
+// dark edges beyond
+const PALETTE_LUT = new Uint8Array([
+  9,156,234,10,154,232,11,153,230,11,152,228,12,151,225,13,150,223,14,149,221,15,148,219,
+  16,147,218,18,146,216,19,145,213,21,143,210,23,141,206,25,139,202,26,137,199,27,135,195,
+  28,134,192,30,133,190,31,131,188,32,130,186,33,129,184,34,128,182,35,128,180,36,127,179,
+  37,126,178,37,126,177,37,126,177,37,126,177,37,126,177,37,126,177,36,126,177,35,126,178,
+  35,127,178,35,127,179,34,127,179,35,127,179,35,127,179,35,128,180,36,128,180,36,128,179,
+  36,127,179,36,127,179,36,127,179,37,127,178,37,126,177,37,126,177,38,125,175,38,124,174,
+  39,124,172,40,123,170,41,122,169,42,121,167,43,119,164,44,118,162,44,117,160,45,116,158,
+  46,115,155,47,114,153,48,112,151,49,111,149,51,110,146,52,109,144,53,108,142,54,107,140,
+  56,106,138,57,105,136,58,104,134,59,103,132,60,102,130,61,101,128,62,100,127,63,99,125,
+  64,98,123,65,98,122,66,97,120,66,96,119,67,96,118,67,95,117,67,94,116,67,94,115,
+  67,93,114,67,93,113,67,92,112,67,92,111,68,91,110,68,91,110,69,91,109,69,90,108,
+  70,90,107,71,89,106,71,89,106,72,89,105,73,88,104,75,88,103,76,88,102,78,87,101,
+  80,87,100,82,87,99,84,86,98,86,86,97,89,86,96,91,85,95,93,85,94,96,85,93,
+  98,84,92,100,84,91,102,84,90,104,83,89,106,83,88,108,83,88,110,83,87,111,82,86,
+  112,82,85,113,81,84,114,81,83,114,80,82,115,80,82,116,79,81,117,79,80,118,79,80,
+  119,78,80,120,78,79,121,78,79,123,78,79,124,78,78,126,78,78,127,78,78,129,78,78,
+  131,78,78,132,79,78,134,79,78,136,79,78,138,79,79,140,80,79,143,81,79,145,81,80,
+  147,82,80,149,82,81,151,83,81,153,84,82,155,84,82,157,85,83,159,85,83,161,85,83,
+  162,86,84,164,86,84,165,86,84,166,87,84,167,87,84,169,87,84,170,87,84,171,87,84,
+  171,88,85,172,88,85,173,88,85,174,88,85,174,88,85,175,88,85,176,88,85,177,88,85,
+  178,89,85,179,89,84,179,89,84,180,89,84,180,89,84,180,89,84,180,89,84,181,89,84,
+  181,89,84,181,88,84,181,88,84,181,88,84,180,88,83,180,88,83,179,88,83,179,88,83,
+  178,88,83,177,88,83,176,87,83,174,87,83,173,87,82,171,86,82,170,86,82,168,86,82,
+  167,86,82,165,85,81,164,85,81,162,85,81,160,84,81,158,84,81,156,84,80,154,83,80,
+  153,83,80,151,83,80,149,82,79,147,82,79,146,82,79,144,81,79,142,81,79,140,81,78,
+  138,80,78,136,80,78,134,79,77,131,78,77,128,78,76,125,77,75,122,75,74,119,74,73,
+  115,73,72,112,72,71,108,70,70,104,68,68,100,67,67,95,65,65,91,63,64,87,62,63,
+  83,60,61,79,58,60,75,57,58,71,55,57,68,54,55,64,52,54,61,50,52,58,49,51,
+  55,47,50,52,46,49,49,45,48,47,44,47,45,43,46,43,43,46,42,42,45,42,42,45,
+  41,42,45,42,43,46,42,43,46,43,44,47,44,46,49,45,47,50,46,47,50,46,48,51,
+  46,48,51,46,47,50,45,46,49,44,45,48,43,44,47,42,43,46,42,43,46,43,43,46,
+  43,43,46,44,43,46,44,43,46,44,43,47,44,43,46,44,43,46,43,42,45,41,40,44,
+]);
+
 // Vertex shader: one big triangle covering the whole screen
 const VERT = /* glsl */ `
 attribute vec2 a_pos;
@@ -13,26 +51,15 @@ void main() {
 `;
 
 // Fragment shader: Balatro swirl — pixelate, twist, domain warp, and the
-// game's blue/red/dark ring palette
+// game's blue/red/dark ring palette (sampled from the 1D palette texture)
 const FRAG = /* glsl */ `
 precision highp float;
 
-uniform vec2 u_size;   // Canvas size in pixels
-uniform float u_swirl; // Twist intensity
-uniform float u_spin;  // Global rotation speed in rad/s
-uniform float u_time;  // Elapsed seconds
-
-// The game's color ring, looked up by distance from the center:
-// a blue core in the middle, a red ring around it, dark edges beyond
-const vec3 BLUE_CENTER = vec3(0.25, 0.56, 0.85); // soft azure of the middle blob
-const vec3 RED_RING    = vec3(0.80, 0.33, 0.28); // coral red of the surrounding ring
-const vec3 DARK_EDGE   = vec3(0.12, 0.14, 0.19); // dark navy toward the outside
-
-// Where the color transitions sit, in the same units as the warped distance
-// (p is scaled up by 30, so the screen spans about 0..15 from center to edge)
-const float BLUE_RED_MID = 5.5;  // halfway between the blue core and the red ring
-const float RED_DARK_MID = 11.5; // halfway between the red ring and the dark edge
-const float RING_SOFT = 2.5;     // half width of each transition (higher = softer)
+uniform vec2 u_size;        // Canvas size in pixels
+uniform float u_swirl;      // Twist intensity
+uniform float u_spin;       // Global rotation speed in rad/s
+uniform float u_time;       // Elapsed seconds
+uniform sampler2D u_palette; // 1D palette gradient: blue core -> red ring -> dark edges
 
 // Wobble: repeatedly nudge p by its own position — this bends the swirl
 // arms into the wavy Balatro look
@@ -60,14 +87,6 @@ vec2 dir(vec2 acc) {
 // Diagonal twist: cos along (x + y) and sin along (0.711 * x - y)
 vec2 diagonalTwist(vec2 p) {
   return vec2(cos(p.x + p.y) - sin(p.x * 0.711 - p.y));
-}
-
-// The game's ring: blue in the middle, a ring of red around it, dark outside
-vec3 gameRing(float dist) {
-  vec3 col = BLUE_CENTER;
-  col = mix(col, RED_RING,  smoothstep(BLUE_RED_MID - RING_SOFT, BLUE_RED_MID + RING_SOFT, dist));
-  col = mix(col, DARK_EDGE, smoothstep(RED_DARK_MID - RING_SOFT, RED_DARK_MID + RING_SOFT, dist));
-  return col;
 }
 
 void main() {
@@ -103,9 +122,12 @@ void main() {
     p -= 1.0 * diagonalTwist(p);
   }
 
-  // 10: The game's ring — look up the color by distance from the center:
-  // blue in the middle, a ring of red around it, dark outside
-  vec3 color = gameRing(length(p));
+  // 10: The game's ring — the color is sampled from the 1D palette gradient
+  // (blue core -> red ring -> dark edges) by the warped distance from the
+  // center, so the ring boundaries follow the swirl instead of perfect circles.
+  // maxDist = the palette position at the screen corner.
+  float maxDist = 30.0 * length(vec2(u_size.x / u_size.y * 0.5, 0.5));
+  vec3 color = texture2D(u_palette, vec2(length(p) / maxDist, 0.5)).rgb;
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -144,6 +166,27 @@ function init() {
     return;
   }
   gl.useProgram(program);
+
+  // Upload the 1x256 palette gradient as a texture the shader can sample
+  const paletteTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, paletteTex);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGB,
+    256,
+    1,
+    0,
+    gl.RGB,
+    gl.UNSIGNED_BYTE,
+    PALETTE_LUT
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.uniform1i(gl.getUniformLocation(program, "u_palette"), 0);
 
   // The fullscreen big triangle
   const buf = gl.createBuffer();
