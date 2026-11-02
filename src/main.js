@@ -49,6 +49,11 @@ vec2 rotate(vec2 v, float a) {
   return mat2(c, s, -s, c) * v;
 }
 
+// Diagonal twist: cos along (x + y) and sin along (0.711 * x - y)
+vec2 twist(vec2 p) {
+  return vec2(cos(p.x + p.y) - sin(p.x * 0.711 - p.y));
+}
+
 // Take the x coordinate and look up a color on the band:
 // four color segments joined head-to-tail into a loop
 vec3 paint(float x) {
@@ -78,11 +83,12 @@ void main() {
   // 05: Scale up the map before the wobble nudge
   p = p * 30.0;
 
-  // 06: Wobble — "look at where you are, then push yourself by that position".
-  // p.yx feeds (y, x) back into sin, so x gets pushed by y and y by x;
-  // applying it repeatedly bends the swirl arms into wavy bands
+  // 06: Diagonal twist loop
   for (int i = 0; i < WOBBLE_ITER; i++) {
-    p += WOBBLE_AMP * sin(p.yx + u_time);
+    // acc += sin(max(pos.x, pos.y)) + pos;
+    // p += 0.5 * normalize(acc);
+    // p -= 1.0 * diagonalTwist(p);
+    p -= 1.0 * twist(p);
   }
 
   // 07: Take the x coordinate and look up the color on the band
@@ -132,7 +138,7 @@ function init() {
   gl.bufferData(
     gl.ARRAY_BUFFER,
     new Float32Array([-1, -1, 3, -1, -1, 3]),
-    gl.STATIC_DRAW
+    gl.STATIC_DRAW,
   );
   const aPos = gl.getAttribLocation(program, "a_pos");
   gl.enableVertexAttribArray(aPos);
