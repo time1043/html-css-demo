@@ -22,15 +22,13 @@ body {
   display: block;
 }
 
-/* Static fallback when WebGL is unavailable: the same four-color band */
+/* Static fallback when WebGL is unavailable: the game's blue/red/dark ring */
 body.no-webgl #swirl {
-  background: linear-gradient(
-    90deg,
-    #ffb021,
-    #29e0d2 20%,
-    #1761c7 40%,
-    #ff2e75 60%,
-    #ffb021 80%,
-    #29e0d2
+  background: radial-gradient(
+    circle at 50% 50%,
+    #408fd9 0%,
+    #408fd9 10%,
+    #cc5447 28%,
+    #1f2430 48%
   );
 }

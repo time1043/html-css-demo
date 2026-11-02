@@ -1,7 +1,6 @@
 // ================== Tunable parameters (tweak these while polishing) ==================
 const CONFIG = {
   swirl: 4.0, // Twist intensity: the farther from the center, the more it turns (the 4.0 from tutorial step 03)
-  freq: 0.1, // Color band frequency: 0.1 gives 1 full color cycle every 10 distance units (matches tutorial step 08)
   spin: 0.25, // Global rotation speed in rad/s; the tutorial hardcoded 1.0 (one full turn every ~6.3s). Lower = slower
 };
 
@@ -13,28 +12,27 @@ void main() {
 }
 `;
 
-// Fragment shader: tutorial steps 01-07 — the full Balatro swirl: pixelate, twist, wobble, spin
+// Fragment shader: Balatro swirl — pixelate, twist, domain warp, and the
+// game's blue/red/dark ring palette
 const FRAG = /* glsl */ `
 precision highp float;
 
 uniform vec2 u_size;   // Canvas size in pixels
-uniform float u_freq;  // Color band frequency
 uniform float u_swirl; // Twist intensity
 uniform float u_spin;  // Global rotation speed in rad/s
 uniform float u_time;  // Elapsed seconds
 
-// The four colors on the band, measured from the flat plateaus of the tutorial's canvas
-const vec3 CYAN   = vec3(0.094, 0.765, 0.776);
-const vec3 BLUE   = vec3(0.000, 0.443, 0.741);
-const vec3 PINK   = vec3(1.000, 0.176, 0.565);
-const vec3 ORANGE = vec3(1.000, 0.710, 0.188);
+// The game's color ring, looked up by distance from the center:
+// a blue core in the middle, a red ring around it, dark edges beyond
+const vec3 BLUE_CENTER = vec3(0.25, 0.56, 0.85); // soft azure of the middle blob
+const vec3 RED_RING    = vec3(0.80, 0.33, 0.28); // coral red of the surrounding ring
+const vec3 DARK_EDGE   = vec3(0.12, 0.14, 0.19); // dark navy toward the outside
 
-// Phase shift that lines the bands up with the tutorial (pure orange around x = 0.32)
-const float BAND_PHASE = 0.5;
-
-// Half width of the blend between neighboring colors; the rest of each
-// segment stays a flat plateau (this gives the bands their crisp edges)
-const float BAND_SOFT = 0.25;
+// Where the color transitions sit, in the same units as the warped distance
+// (p is scaled up by 30, so the screen spans about 0..15 from center to edge)
+const float BLUE_RED_MID = 5.5;  // halfway between the blue core and the red ring
+const float RED_DARK_MID = 11.5; // halfway between the red ring and the dark edge
+const float RING_SOFT = 2.5;     // half width of each transition (higher = softer)
 
 // Wobble: repeatedly nudge p by its own position — this bends the swirl
 // arms into the wavy Balatro look
@@ -64,20 +62,12 @@ vec2 diagonalTwist(vec2 p) {
   return vec2(cos(p.x + p.y) - sin(p.x * 0.711 - p.y));
 }
 
-// Band color: look up a color on the band by distance (concentric rings)
-// four color segments joined head-to-tail into a loop
-vec3 bandColor(float dist) {
-  float t = fract(dist * u_freq + BAND_PHASE) * 4.0;
-  vec3 col = mix(CYAN,   BLUE,   smoothstep(0.5 - BAND_SOFT, 0.5 + BAND_SOFT, t));
-  col = mix(col, PINK,   smoothstep(1.5 - BAND_SOFT, 1.5 + BAND_SOFT, t));
-  col = mix(col, ORANGE, smoothstep(2.5 - BAND_SOFT, 2.5 + BAND_SOFT, t));
-  col = mix(col, CYAN,   smoothstep(3.5 - BAND_SOFT, 3.5 + BAND_SOFT, t));
+// The game's ring: blue in the middle, a ring of red around it, dark outside
+vec3 gameRing(float dist) {
+  vec3 col = BLUE_CENTER;
+  col = mix(col, RED_RING,  smoothstep(BLUE_RED_MID - RING_SOFT, BLUE_RED_MID + RING_SOFT, dist));
+  col = mix(col, DARK_EDGE, smoothstep(RED_DARK_MID - RING_SOFT, RED_DARK_MID + RING_SOFT, dist));
   return col;
-}
-
-// Backward-compatible alias for paint
-vec3 paint(float x) {
-  return bandColor(x);
 }
 
 void main() {
@@ -113,8 +103,9 @@ void main() {
     p -= 1.0 * diagonalTwist(p);
   }
 
-  // 10: Look up color by distance from center: concentric rings
-  vec3 color = bandColor(length(p));
+  // 10: The game's ring — look up the color by distance from the center:
+  // blue in the middle, a ring of red around it, dark outside
+  vec3 color = gameRing(length(p));
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -167,7 +158,6 @@ function init() {
   gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
   const uSize = gl.getUniformLocation(program, "u_size");
-  const uFreq = gl.getUniformLocation(program, "u_freq");
   const uSwirl = gl.getUniformLocation(program, "u_swirl");
   const uSpin = gl.getUniformLocation(program, "u_spin");
   const uTime = gl.getUniformLocation(program, "u_time");
@@ -199,7 +189,6 @@ function init() {
     resize();
     gl.uniform2f(uSize, canvas.width, canvas.height);
     gl.uniform1f(uTime, hasPinnedTime ? pinnedTime : elapsed);
-    gl.uniform1f(uFreq, CONFIG.freq);
     gl.uniform1f(uSwirl, CONFIG.swirl);
     gl.uniform1f(uSpin, CONFIG.spin);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
