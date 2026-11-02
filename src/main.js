@@ -49,8 +49,16 @@ vec2 rotate(vec2 v, float a) {
   return mat2(c, s, -s, c) * v;
 }
 
+// Direction vector from accumulated coordinate ("方向")
+vec2 dir(vec2 acc) {
+  return vec2(
+    cos(5.1123314 + 0.353 * acc.y + u_time * 0.131121),
+    sin(acc.x - 0.113 * u_time)
+  );
+}
+
 // Diagonal twist: cos along (x + y) and sin along (0.711 * x - y)
-vec2 twist(vec2 p) {
+vec2 diagonalTwist(vec2 p) {
   return vec2(cos(p.x + p.y) - sin(p.x * 0.711 - p.y));
 }
 
@@ -80,18 +88,25 @@ void main() {
   // and the whole pattern keeps spinning as time passes
   p = rotate(p, r * u_swirl - u_time);
 
-  // 05: Scale up the map before the wobble nudge
+  // 05: Scale up coordinates before deformation loop
   p = p * 30.0;
 
-  // 06: Diagonal twist loop
+  // Accumulator initialized to (p.x + p.y)
+  vec2 acc = vec2(p.x + p.y);
+
+  // 06: Repeat 5 times
   for (int i = 0; i < WOBBLE_ITER; i++) {
-    // acc += sin(max(pos.x, pos.y)) + pos;
-    // p += 0.5 * normalize(acc);
-    // p -= 1.0 * diagonalTwist(p);
-    p -= 1.0 * twist(p);
+    // 07: Accumulate non-linear displacement
+    acc += vec2(sin(max(p.x, p.y))) + p;
+
+    // 08: Push position along direction vector
+    p += 0.5 * dir(acc);
+
+    // 09: Diagonal twist
+    p -= 1.0 * diagonalTwist(p);
   }
 
-  // 07: Take the x coordinate and look up the color on the band
+  // 10: Look up the color on the band
   vec3 color = paint(p.x);
 
   gl_FragColor = vec4(color, 1.0);
