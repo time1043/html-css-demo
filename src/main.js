@@ -21,20 +21,20 @@ void main() {
 // decompiled swirl shader — see the Balatro modding community's recreations).
 // The color is NOT a palette lookup: a scalar "smoke amount" is computed from
 // the warped distance and blended between three colors, with a glossy
-// highlight term on top.
+// lighting term on top. The three colors and the contrast are externs the
+// game eases per game state (see the STATES table below).
 const FRAG = /* glsl */ `
 precision highp float;
 
-uniform vec2 u_size;  // Canvas size in pixels
-uniform float u_spin; // Accumulated swirl angle in radians
-uniform float u_flow; // Accumulated warp phase
+uniform vec2 u_size;        // Canvas size in pixels
+uniform float u_swirl;      // Twist intensity
+uniform float u_spin;       // Accumulated swirl angle in radians
+uniform float u_flow;       // Accumulated warp phase
+uniform vec3 u_c1;          // colour_1: the per-state base colour
+uniform vec3 u_c2;          // colour_2: the per-state highlight colour
+uniform vec3 u_c3;          // colour_3: the per-state deep tone
+uniform float u_contrast;   // The per-state contrast
 
-// The game's menu colors
-const vec3 COLOR1 = vec3(0.871, 0.267, 0.231); // #DE443B red
-const vec3 COLOR2 = vec3(0.0, 0.42, 0.706);    // #006BB4 blue
-const vec3 COLOR3 = vec3(0.086, 0.137, 0.145); // #162325 dark
-
-const float CONTRAST = 3.5;
 const float LIGHTING = 0.4;
 const float SWIRL = 0.25;
 
@@ -59,15 +59,15 @@ vec3 paint(vec2 coords) {
     uv -= cos(uv.x + uv.y) - sin(uv.x * 0.711 - uv.y);
   }
 
-  float contrastMod = 0.25 * CONTRAST + 0.5 * SWIRL + 1.2;
+  float contrastMod = 0.25 * u_contrast + 0.5 * SWIRL + 1.2;
   float amount = min(2.0, max(0.0, length(uv) * 0.035 * contrastMod));
-  float c1 = max(0.0, 1.0 - CONTRAST * abs(1.0 - amount));
-  float c2 = max(0.0, 1.0 - CONTRAST * abs(amount));
+  float c1 = max(0.0, 1.0 - u_contrast * abs(1.0 - amount));
+  float c2 = max(0.0, 1.0 - u_contrast * abs(amount));
   float c3 = 1.0 - min(1.0, c1 + c2);
   float light = (LIGHTING - 0.2) * max(c1 * 5.0 - 4.0, 0.0) + LIGHTING * max(c2 * 5.0 - 4.0, 0.0);
-  vec3 gap = COLOR3;
-  float base = 0.3 / CONTRAST;
-  vec3 color = base * COLOR1 + (1.0 - base) * (COLOR1 * c1 + COLOR2 * c2 + gap * c3) + light;
+  vec3 gap = u_c3;
+  float base = 0.3 / u_contrast;
+  vec3 color = base * u_c1 + (1.0 - base) * (u_c1 * c1 + u_c2 * c2 + gap * c3) + light;
   return color;
 }
 
@@ -128,6 +128,10 @@ function init() {
   const uSize = gl.getUniformLocation(program, "u_size");
   const uSpin = gl.getUniformLocation(program, "u_spin");
   const uFlow = gl.getUniformLocation(program, "u_flow");
+  const uC1 = gl.getUniformLocation(program, "u_c1");
+  const uC2 = gl.getUniformLocation(program, "u_c2");
+  const uC3 = gl.getUniformLocation(program, "u_c3");
+  const uContrast = gl.getUniformLocation(program, "u_contrast");
 
   // Track the window size and render at the device pixel ratio (capped at 2 so high-DPI screens stay fast)
   function resize() {
@@ -145,6 +149,15 @@ function init() {
   const pinnedTime = parseFloat(new URLSearchParams(location.search).get("t"));
   const hasPinnedTime = Number.isFinite(pinnedTime);
 
+  // The live (eased) colors and contrast. setBackdrop() moves the targets;
+  // the frame loop walks the live values toward them (see EASE_SECONDS).
+  const live = {
+    c1: [0.871, 0.267, 0.231],
+    c2: [0.0, 0.42, 0.706],
+    c3: [0.086, 0.137, 0.145],
+    contrast: 3.5,
+  };
+
   // Render loop: the swirl angle accumulates at CONFIG.spin, the warp phase
   // at CONFIG.flowSpeed (both capped so the picture never jumps after a
   // background tab)
@@ -161,6 +174,10 @@ function init() {
     gl.uniform2f(uSize, canvas.width, canvas.height);
     gl.uniform1f(uSpin, -0.4 + spinAngle);
     gl.uniform1f(uFlow, hasPinnedTime ? pinnedTime * CONFIG.flowSpeed : flow);
+    gl.uniform3f(uC1, live.c1[0], live.c1[1], live.c1[2]);
+    gl.uniform3f(uC2, live.c2[0], live.c2[1], live.c2[2]);
+    gl.uniform3f(uC3, live.c3[0], live.c3[1], live.c3[2]);
+    gl.uniform1f(uContrast, live.contrast);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     requestAnimationFrame(frame);
