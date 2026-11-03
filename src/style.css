@@ -32,3 +32,16 @@ body.no-webgl #swirl {
     #1f2430 48%
   );
 }
+
+/* Current backdrop palette label (keys 1-9 switch palettes) */
+#backdrop-label {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 1;
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  user-select: none;
+}

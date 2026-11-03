@@ -4,6 +4,59 @@ const CONFIG = {
   flowSpeed: 7.0, // How fast the warp pattern evolves (the game uses speed*7 per second)
 };
 
+// The game's per-state backdrop palettes: the post-easing colour triples the
+// shader receives, ported from backdrop.lua (game.lua:2283-2291 +
+// common_events.lua:276-360). Each entry drives the same swirl shader with a
+// different colour_1/colour_2/colour_3 + contrast, exactly like the game
+// recolours its backdrop per game state.
+const BACKDROP_STATES = {
+  menu: {
+    label: '主菜单',
+    c1: [0.871, 0.267, 0.231], c2: [0.0, 0.42, 0.706], c3: [0.086, 0.137, 0.145],
+    contrast: 3.5,
+  },
+  blind: {
+    label: '小/大盲注',
+    c1: [0.282, 0.464, 0.388], c2: [0.408, 0.671, 0.561], c3: [0.219, 0.361, 0.302],
+    contrast: 1.0,
+  },
+  tarot: {
+    label: '塔罗包',
+    c1: [0.031, 0.031, 0.031], c2: [0.573, 0.408, 0.937], c3: [0.012, 0.012, 0.012],
+    contrast: 1.5,
+  },
+  spectral: {
+    label: '幽灵包',
+    c1: [0.031, 0.031, 0.031], c2: [0.286, 0.72, 0.976], c3: [0.012, 0.012, 0.012],
+    contrast: 2.0,
+  },
+  standard: {
+    label: '标准包',
+    c1: [0.996, 0.373, 0.333], c2: [0.041, 0.041, 0.041], c3: [0.013, 0.013, 0.013],
+    contrast: 3.0,
+  },
+  buffoon: {
+    label: '小丑包',
+    c1: [0.0, 0.0, 0.0], c2: [0.0, 0.74, 0.994], c3: [0.0, 0.0, 0.0],
+    contrast: 2.0,
+  },
+  planet: {
+    label: '星球包',
+    c1: [0.0, 0.0, 0.0], c2: [0.0, 0.0, 0.0], c3: [0.0, 0.0, 0.0],
+    contrast: 3.0,
+  },
+  boss: {
+    label: 'Boss 盲注',
+    c1: [0.482, 0.145, 0.121], c2: [0.243, 0.093, 0.082], c3: [0.193, 0.058, 0.048],
+    contrast: 2.0,
+  },
+  showdown: {
+    label: '决战',
+    c1: [0.996, 0.373, 0.333], c2: [0.0, 0.616, 1.0], c3: [0.024, 0.024, 0.024],
+    contrast: 3.0,
+  },
+};
+
 // The game's own menu colors (passed as colour_1/colour_2 externs by the game's Lua)
 const COLOR1 = [0.871, 0.267, 0.231]; // #DE443B red
 const COLOR2 = [0.0, 0.42, 0.706]; // #006BB4 blue
@@ -158,6 +211,41 @@ function init() {
     contrast: 3.5,
   };
 
+  // The backdrop state machine: setBackdrop() retargets the palette and the
+  // frame loop eases the live values toward it. The game eases over 0.6s
+  // (common_events.lua:299) with contrast at twice the step.
+  const EASE_SECONDS = 0.6;
+  const target = {
+    c1: [...live.c1],
+    c2: [...live.c2],
+    c3: [...live.c3],
+    contrast: live.contrast,
+  };
+  const approach = (current, targetValue, step) => {
+    const delta = targetValue - current;
+    if (delta > step) return current + step;
+    if (delta < -step) return current - step;
+    return targetValue;
+  };
+  function setBackdrop(name) {
+    const palette = BACKDROP_STATES[name];
+    if (!palette) return;
+    target.c1 = [...palette.c1];
+    target.c2 = [...palette.c2];
+    target.c3 = [...palette.c3];
+    target.contrast = palette.contrast;
+    const label = document.getElementById('backdrop-label');
+    if (label) label.textContent = `${palette.label}（${name}）`;
+  }
+  setBackdrop('menu');
+
+  // Flip through the palettes with number keys, like the game does per game state
+  window.addEventListener('keydown', (event) => {
+    const names = Object.keys(BACKDROP_STATES);
+    const index = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].indexOf(event.key);
+    if (index >= 0 && names[index]) setBackdrop(names[index]);
+  });
+
   // Render loop: the swirl angle accumulates at CONFIG.spin, the warp phase
   // at CONFIG.flowSpeed (both capped so the picture never jumps after a
   // background tab)
@@ -169,6 +257,16 @@ function init() {
     last = now;
     spinAngle += dt * CONFIG.spin;
     flow += dt * CONFIG.flowSpeed;
+
+    // Ease the live colours toward the backdrop targets: the game walks them
+    // over 0.6s (common_events.lua:299), contrast at twice the step
+    const step = dt / EASE_SECONDS;
+    for (let i = 0; i < 3; i++) {
+      live.c1[i] = approach(live.c1[i], target.c1[i], step);
+      live.c2[i] = approach(live.c2[i], target.c2[i], step);
+      live.c3[i] = approach(live.c3[i], target.c3[i], step);
+    }
+    live.contrast = approach(live.contrast, target.contrast, step * 2);
 
     resize();
     gl.uniform2f(uSize, canvas.width, canvas.height);
